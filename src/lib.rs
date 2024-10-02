@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, os::unix::net};
 
 use indexmap::IndexSet;
 use thiserror::Error;
@@ -148,15 +148,19 @@ pub enum DerivationTemplate {
     IdentityMfa,
 }
 
-/// On one specific network
+/// A collection of sets of FactorInstances, all
+/// on the same network, for different DerivationTemplates.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct FactorInstancesForSpecificNetworkCache {
+pub struct CollectionsOfFactorInstances {
     hidden_constructor: HiddenConstructor,
     pub network: NetworkID,
     pub unsecurified_accounts: IndexSet<AccountVeci>,
     pub unsecurified_identities: IndexSet<IdentityVeci>,
 }
-impl FactorInstancesForSpecificNetworkCache {
+impl CollectionsOfFactorInstances {
+    pub fn empty(network: NetworkID) -> Self {
+        Self::new(network, IndexSet::new(), IndexSet::new()).unwrap()
+    }
     pub fn new(
         network: NetworkID,
         unsecurified_accounts: IndexSet<AccountVeci>,
@@ -181,6 +185,20 @@ impl FactorInstancesForSpecificNetworkCache {
     }
 }
 
+/// On one specific network
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FactorInstancesForSpecificNetworkCache(CollectionsOfFactorInstances);
+
+impl FactorInstancesForSpecificNetworkCache {
+    pub fn empty(network: NetworkID) -> Self {
+        Self::new(CollectionsOfFactorInstances::empty(network))
+    }
+    pub fn new(instances: CollectionsOfFactorInstances) -> Self {
+        Self(instances)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FactorInstancesForEachNetworkCache {
     #[allow(dead_code)]
     hidden_constructor: HiddenConstructor,
@@ -193,16 +211,13 @@ impl FactorInstancesForEachNetworkCache {
         self.networks
             .get(&network)
             .cloned()
-            .unwrap_or(FactorInstancesForSpecificNetworkCache {
-                hidden_constructor: HiddenConstructor,
-                network,
-                unsecurified_accounts: IndexSet::new(),
-                unsecurified_identities: IndexSet::new(),
-            })
+            .unwrap_or(FactorInstancesForSpecificNetworkCache::empty(network))
     }
 }
 
 pub struct FactorInstancesProvider {
+    /// A Clone of a cache, the caller MUST commit the changes to the
+    /// original cache if they want to persist them.
     #[allow(dead_code)]
     cache: FactorInstancesForSpecificNetworkCache,
 }
@@ -211,9 +226,30 @@ impl FactorInstancesProvider {
     fn for_specific_network(cache: FactorInstancesForSpecificNetworkCache) -> Self {
         Self { cache }
     }
+}
 
+impl FactorInstancesProvider {
     pub fn new(cache: FactorInstancesForEachNetworkCache, network_id: NetworkID) -> Self {
         let cache = cache.clone_for_network(network_id);
         Self::for_specific_network(cache)
     }
+    pub fn provide(self) -> Result<ProvidedInstances> {
+        todo!()
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ProvidedInstances {
+    hidden_constructor: HiddenConstructor,
+
+    /// The caller of FactorInstancesProvider::provide MUST override their
+    /// original cache with this updated one if they want to persist the changes.
+    pub cache_to_persist: FactorInstancesForEachNetworkCache,
+
+    /// The factor instances that were provided to be used directly, this is sometimes
+    /// empty, e.g. in the case of PreDeriveKeys for new FactorSource.
+    ///
+    /// And often this contains just some of the newly created instances, because
+    /// some might have gone into the `cache_to_persist` instead.
+    pub instances_to_be_used: CollectionsOfFactorInstances,
 }
