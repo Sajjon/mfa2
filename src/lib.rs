@@ -220,11 +220,127 @@ pub struct FactorInstancesProvider {
     /// original cache if they want to persist them.
     #[allow(dead_code)]
     cache: FactorInstancesForSpecificNetworkCache,
+
+    query: InstancesQuery,
+
+    next_entity_index_assigner: NextDerivationEntityIndexAssigner,
 }
 
 impl FactorInstancesProvider {
-    fn for_specific_network(cache: FactorInstancesForSpecificNetworkCache) -> Self {
-        Self { cache }
+    fn for_specific_network(
+        cache: FactorInstancesForSpecificNetworkCache,
+        query: InstancesQuery,
+        next_entity_index_assigner: NextDerivationEntityIndexAssigner,
+    ) -> Self {
+        Self {
+            cache,
+            query,
+            next_entity_index_assigner,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MatrixOfFactorInstances {
+    pub threshold: u16,
+    pub threshold_factors: IndexSet<HDFactorInstance>,
+    pub override_factors: IndexSet<HDFactorInstance>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum EntitySecurityState {
+    Unsecurified(HDFactorInstance),
+    Securified(MatrixOfFactorInstances),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Account {
+    entity_security_state: EntitySecurityState,
+}
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Persona {
+    entity_security_state: EntitySecurityState,
+}
+
+pub struct NextDerivationEntityIndexProfileAnalyzingAssigner {
+    /// might be empty
+    accounts_on_network: IndexSet<Account>,
+    /// might be empty
+    personas_on_network: IndexSet<Persona>,
+}
+impl NextDerivationEntityIndexProfileAnalyzingAssigner {
+    pub fn new(profile: Option<Profile>) -> Self {
+        todo!()
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct NextDerivationEntityIndexWithLocalOffsets {
+    local_offsets: HashMap<FactorSourceID, u32>,
+}
+pub struct NextDerivationEntityIndexAssigner {
+    profile_analyzing: NextDerivationEntityIndexProfileAnalyzingAssigner,
+    local_offsets: NextDerivationEntityIndexWithLocalOffsets,
+}
+impl NextDerivationEntityIndexAssigner {
+    pub fn new(profile: Option<Profile>) -> Self {
+        let profile_analyzing = NextDerivationEntityIndexProfileAnalyzingAssigner::new(profile);
+        Self {
+            profile_analyzing,
+            local_offsets: NextDerivationEntityIndexWithLocalOffsets::default(),
+        }
+    }
+}
+
+impl FactorInstancesProvider {
+    /// `Profile` is optional since None in case of Onboarding Account Recovery Scan
+    /// No need to pass Profile as mut, since we just need to read it for the
+    /// next derivation entity indices.
+    pub fn new(
+        cache: FactorInstancesForEachNetworkCache,
+        network_id: NetworkID,
+        query: InstancesQuery,
+        profile: Option<Profile>,
+    ) -> Self {
+        let cache = cache.clone_for_network(network_id);
+        Self::for_specific_network(
+            cache,
+            query,
+            NextDerivationEntityIndexAssigner::new(profile),
+        )
+    }
+
+    async fn provide_account_veci(
+        &self,
+        factor_source: HDFactorSource,
+    ) -> Result<ProvidedInstances> {
+        todo!()
+    }
+
+    async fn provide_accounts_mfa(
+        &self,
+        number_of_instances_per_factor_source: usize,
+        factor_sources: IndexSet<HDFactorSource>,
+    ) -> Result<ProvidedInstances> {
+        todo!()
+    }
+
+    pub async fn provide(self) -> Result<ProvidedInstances> {
+        match self.query {
+            InstancesQuery::AccountMfa {
+                number_of_instances_per_factor_source,
+                ref factor_sources,
+            } => {
+                self.provide_accounts_mfa(
+                    number_of_instances_per_factor_source,
+                    factor_sources.clone(),
+                )
+                .await
+            }
+            InstancesQuery::AccountVeci { ref factor_source } => {
+                self.provide_account_veci(factor_source.clone()).await
+            }
+        }
     }
 }
 
@@ -247,29 +363,32 @@ impl KeysCollector {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Profile;
+
 pub enum InstancesQuery {
+    /// Uses the "next" derivation entity index for the derivation path
+    /// The network is already known by the FactorInstancesProvider
+    AccountVeci {
+        /// The factor to use to derive the instance, typically the main BDFS.
+        factor_source: HDFactorSource,
+    },
+
+    /// Uses a range of derivation paths, starting at the next, per factor source
+    /// The network is already known by the FactorInstancesProvider
+    ///
+    /// N.B. we COULD have made this more advance/complex by passing a:
+    /// `number_of_instances_for_each_factor_source: HashMap<HDFactorSource, usize>`
+    /// but we don't need that complexity for now, we assume we want to get
+    /// `number_of_instances_per_factor_source` for **each** factor source.
+    ///
+    /// `number_of_instances_per_factor_source` should be interpreted as
+    /// `number_of_accounts_to_securify`.
     AccountMfa {
-        accounts: usize,
+        number_of_instances_per_factor_source: usize,
         factor_sources: IndexSet<HDFactorSource>,
     },
-    // IdentitiesMfa { identities: usize, factor_sources: IndexSet<HDFactorSource> },
-    // AccountVeci,
-    // IdentityVeci,
     // PreDeriveKeysForFactorSource
-}
-
-impl FactorInstancesProvider {
-    pub fn new(
-        cache: FactorInstancesForEachNetworkCache,
-        network_id: NetworkID,
-        query: InstancesQuery,
-    ) -> Self {
-        let cache = cache.clone_for_network(network_id);
-        Self::for_specific_network(cache)
-    }
-    pub async fn provide(self) -> Result<ProvidedInstances> {
-        todo!()
-    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
