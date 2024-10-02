@@ -1,6 +1,6 @@
 use std::{collections::HashMap, os::unix::net};
 
-use indexmap::IndexSet;
+use indexmap::{IndexMap, IndexSet};
 use thiserror::Error;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Error)]
@@ -228,12 +228,46 @@ impl FactorInstancesProvider {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct HDFactorSource {
+    factor_source_id: FactorSourceID,
+}
+
+pub struct KeysCollector;
+impl KeysCollector {
+    pub fn new(
+        factors: IndexSet<HDFactorSource>,
+        derivation_paths: IndexMap<FactorSourceID, IndexSet<DerivationPath>>,
+    ) -> Self {
+        todo!()
+    }
+    #[allow(unused)]
+    pub async fn collect_keys(self) -> IndexSet<HDFactorInstance> {
+        todo!()
+    }
+}
+
+pub enum InstancesQuery {
+    AccountMfa {
+        accounts: usize,
+        factor_sources: IndexSet<HDFactorSource>,
+    },
+    // IdentitiesMfa { identities: usize, factor_sources: IndexSet<HDFactorSource> },
+    // AccountVeci,
+    // IdentityVeci,
+    // PreDeriveKeysForFactorSource
+}
+
 impl FactorInstancesProvider {
-    pub fn new(cache: FactorInstancesForEachNetworkCache, network_id: NetworkID) -> Self {
+    pub fn new(
+        cache: FactorInstancesForEachNetworkCache,
+        network_id: NetworkID,
+        query: InstancesQuery,
+    ) -> Self {
         let cache = cache.clone_for_network(network_id);
         Self::for_specific_network(cache)
     }
-    pub fn provide(self) -> Result<ProvidedInstances> {
+    pub async fn provide(self) -> Result<ProvidedInstances> {
         todo!()
     }
 }
@@ -251,5 +285,5 @@ pub struct ProvidedInstances {
     ///
     /// And often this contains just some of the newly created instances, because
     /// some might have gone into the `cache_to_persist` instead.
-    pub instances_to_be_used: CollectionsOfFactorInstances,
+    pub instances_to_be_used: IndexSet<HDFactorInstance>,
 }
