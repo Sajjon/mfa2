@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Debug)]
 pub struct ProvidedInstances {
     hidden_constructor: HiddenConstructor,
 

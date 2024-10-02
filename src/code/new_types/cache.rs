@@ -1,13 +1,22 @@
+use std::sync::RwLock;
+
 use crate::prelude::*;
 
 /// On one specific network
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Debug)]
 pub struct FactorInstancesForSpecificNetworkCache {
     hidden_constructor: HiddenConstructor,
     pub network_id: NetworkID,
-    per_factor_source: IndexMap<FactorSourceID, CollectionsOfFactorInstances>,
+    per_factor_source: RwLock<IndexMap<FactorSourceID, CollectionsOfFactorInstances>>,
 }
 impl FactorInstancesForSpecificNetworkCache {
+    pub fn cloned_snapshot(&self) -> Self {
+        Self {
+            hidden_constructor: HiddenConstructor,
+            network_id: self.network_id,
+            per_factor_source: RwLock::new(self.per_factor_source.read().unwrap().clone()),
+        }
+    }
     pub fn append_for_factor(
         &self,
         factor_source_id: FactorSourceID,
@@ -27,13 +36,22 @@ pub struct FactorInstanceFromCache {
     /// we SHOULD derive more!
     pub was_last_used: bool,
 }
+impl FactorInstanceFromCache {
+    pub fn new(instance: HDFactorInstance, was_last_used: bool) -> Self {
+        Self {
+            hidden_constructor: HiddenConstructor,
+            instance,
+            was_last_used,
+        }
+    }
+}
 
 impl FactorInstancesForSpecificNetworkCache {
     pub fn empty(network: NetworkID) -> Self {
         Self {
             hidden_constructor: HiddenConstructor,
             network_id: network,
-            per_factor_source: IndexMap::new(),
+            per_factor_source: RwLock::new(IndexMap::new()),
         }
     }
 
@@ -42,7 +60,17 @@ impl FactorInstancesForSpecificNetworkCache {
         &self,
         factor_source_id: FactorSourceID,
     ) -> Option<FactorInstanceFromCache> {
-        todo!()
+        let mut default = CollectionsOfFactorInstances::empty(self.network_id, factor_source_id);
+        let mut binding = self.per_factor_source.write().unwrap();
+        let collections = binding.get_mut(&factor_source_id).unwrap_or(&mut default);
+        if let Some(first) = collections.take_first_account_veci() {
+            Some(FactorInstanceFromCache::new(
+                first.instance(),
+                collections.unsecurified_accounts.is_empty(),
+            ))
+        } else {
+            None
+        }
     }
 
     /// Does NOT mutate self
@@ -54,7 +82,13 @@ impl FactorInstancesForSpecificNetworkCache {
     }
 }
 
-#[derive(Clone, Default, Debug, PartialEq, Eq)]
+impl CollectionsOfFactorInstances {
+    pub fn take_first_account_veci(&mut self) -> Option<AccountVeci> {
+        todo!()
+    }
+}
+
+#[derive(Default, Debug)]
 pub struct FactorInstancesForEachNetworkCache {
     #[allow(dead_code)]
     hidden_constructor: HiddenConstructor,
@@ -72,7 +106,7 @@ impl FactorInstancesForEachNetworkCache {
         &self,
         network_id: NetworkID,
     ) -> Option<FactorInstancesForSpecificNetworkCache> {
-        self.networks.get(&network_id).cloned()
+        self.networks.get(&network_id).map(|x| x.cloned_snapshot())
     }
     pub fn merge(&self, on_network: FactorInstancesForSpecificNetworkCache) -> Result<()> {
         todo!()
