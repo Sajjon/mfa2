@@ -1,9 +1,9 @@
-use core::{error, net};
+use std::collections::HashMap;
 
 use indexmap::IndexSet;
 use thiserror::Error;
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Error)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Error)]
 pub enum CommonError {
     #[error("Error")]
     Fail,
@@ -14,7 +14,7 @@ pub type Result<T, E = CommonError> = std::result::Result<T, E>;
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct HiddenConstructor;
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct DerivationPath {
     pub network_id: NetworkID,
     pub entity_kind: CAP26EntityKind,
@@ -90,25 +90,25 @@ impl IdentityVeci {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum NetworkID {
     Mainnet,
     Testnet,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum CAP26EntityKind {
     Account,
     Identity,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum CAP26KeyKind {
     TransactionSigning,
     AuthenticationSigning,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum CAP26EntityIndex {
     Securified(u32),
     Unsecurified(u32),
@@ -122,13 +122,13 @@ impl CAP26EntityIndex {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum KeySpace {
     Unsecurified,
     Securified,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DerivationTemplate {
     /// Account, Unsecurified, TransactionSigning,
     /// Veci: Virtual Entity Creating (Factor)Instance
@@ -178,5 +178,42 @@ impl FactorInstancesForSpecificNetworkCache {
         } else {
             Err(CommonError::Fail)
         }
+    }
+}
+
+pub struct FactorInstancesForEachNetworkCache {
+    #[allow(dead_code)]
+    hidden_constructor: HiddenConstructor,
+    pub networks: HashMap<NetworkID, FactorInstancesForSpecificNetworkCache>,
+}
+impl FactorInstancesForEachNetworkCache {
+    /// Reads out the existing `FactorInstancesForSpecificNetworkCache` if any,
+    /// otherwise creates a new empty one (mutates self with interior mutability).
+    pub fn clone_for_network(self, network: NetworkID) -> FactorInstancesForSpecificNetworkCache {
+        self.networks
+            .get(&network)
+            .cloned()
+            .unwrap_or(FactorInstancesForSpecificNetworkCache {
+                hidden_constructor: HiddenConstructor,
+                network,
+                unsecurified_accounts: IndexSet::new(),
+                unsecurified_identities: IndexSet::new(),
+            })
+    }
+}
+
+pub struct FactorInstancesProvider {
+    #[allow(dead_code)]
+    cache: FactorInstancesForSpecificNetworkCache,
+}
+
+impl FactorInstancesProvider {
+    fn for_specific_network(cache: FactorInstancesForSpecificNetworkCache) -> Self {
+        Self { cache }
+    }
+
+    pub fn new(cache: FactorInstancesForEachNetworkCache, network_id: NetworkID) -> Self {
+        let cache = cache.clone_for_network(network_id);
+        Self::for_specific_network(cache)
     }
 }
