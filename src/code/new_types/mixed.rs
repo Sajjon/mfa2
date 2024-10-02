@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Default, Debug, PartialEq, Eq, Hash)]
 pub struct HiddenConstructor;
 
 /// A FactorInstance with a derivation path that is used for
@@ -107,6 +107,10 @@ impl CollectionsOfFactorInstances {
     pub fn empty(network: NetworkID, factor_source_id: FactorSourceID) -> Self {
         Self::new(network, factor_source_id, IndexSet::new(), IndexSet::new()).unwrap()
     }
+    pub fn is_full(&self) -> bool {
+        self.unsecurified_accounts.len() == CACHE_SIZE as usize
+            && self.unsecurified_identities.len() == CACHE_SIZE as usize
+    }
     pub fn new(
         network: NetworkID,
         factor_source_id: FactorSourceID,
@@ -142,3 +146,25 @@ impl CollectionsOfFactorInstances {
         })
     }
 }
+
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct ToUseDirectly(IndexSet<HDFactorInstance>);
+impl ToUseDirectly {
+    pub fn new(factor_instances: IndexSet<HDFactorInstance>) -> Self {
+        Self(factor_instances)
+    }
+    pub fn just(factor_instance: HDFactorInstance) -> Self {
+        Self::new(IndexSet::from_iter([factor_instance]))
+    }
+    pub fn account_veci(self) -> Result<AccountVeci> {
+        todo!()
+    }
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct DerivationPathPerFactorSource {
+    per_factor_source: IndexMap<FactorSourceID, IndexSet<DerivationPath>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ToCache(pub CollectionsOfFactorInstances);

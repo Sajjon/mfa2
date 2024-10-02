@@ -1,3 +1,5 @@
+use std::{cell::RefCell, rc::Rc};
+
 use crate::prelude::*;
 
 pub struct FactorInstancesProvider {
@@ -30,17 +32,18 @@ impl FactorInstancesProvider {
     /// No need to pass Profile as mut, since we just need to read it for the
     /// next derivation entity indices.
     pub fn new(
-        cache: FactorInstancesForEachNetworkCache,
+        cache: Rc<RefCell<FactorInstancesForEachNetworkCache>>,
         network_id: NetworkID,
+        profile: impl Into<Option<Profile>>,
         query: InstancesQuery,
-        profile: Option<Profile>,
     ) -> Self {
-        let cache = cache.clone_for_network(network_id);
-        Self::for_specific_network(
-            cache,
-            query,
-            NextDerivationEntityIndexAssigner::new(network_id, profile),
-        )
+        // let cache = cache.clone_for_network(network_id);
+        // Self::for_specific_network(
+        //     cache,
+        //     query,
+        //     NextDerivationEntityIndexAssigner::new(network_id, profile),
+        // )
+        todo!()
     }
 
     pub async fn provide(self) -> Result<ProvidedInstances> {
@@ -58,28 +61,6 @@ impl FactorInstancesProvider {
         }
     }
 }
-
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
-pub struct ToUseDirectly(IndexSet<HDFactorInstance>);
-impl ToUseDirectly {
-    pub fn new(factor_instances: IndexSet<HDFactorInstance>) -> Self {
-        Self(factor_instances)
-    }
-    pub fn just(factor_instance: HDFactorInstance) -> Self {
-        Self::new(IndexSet::from_iter([factor_instance]))
-    }
-    pub fn account_veci(self) -> Result<AccountVeci> {
-        todo!()
-    }
-}
-
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
-pub struct DerivationPathPerFactorSource {
-    per_factor_source: IndexMap<FactorSourceID, IndexSet<DerivationPath>>,
-}
-
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
-pub struct ToCache(IndexSet<HDFactorInstance>);
 
 impl FactorInstancesProvider {
     fn paths_single_factor(
@@ -109,7 +90,7 @@ impl FactorInstancesProvider {
     ) -> Result<ProvidedInstances> {
         let factor_source_id = factor_source.factor_source_id;
 
-        let maybe_cached = self.cache.peek_account_veci(factor_source_id); // TODO peek or consume?
+        let maybe_cached = self.cache.consume_account_veci(factor_source_id);
         let mut maybe_next_index_for_derivation: Option<CAP26EntityIndex> = None;
         let mut veci: Option<HDFactorInstance> = None;
         let mut to_cache: Option<ToCache> = None;
@@ -127,9 +108,11 @@ impl FactorInstancesProvider {
                     .next_account_veci(factor_source_id),
             )
         }
-        assert!(!(veci.is_none() && maybe_next_index_for_derivation.is_none()));
+        assert!(
+            !(veci.is_none() && maybe_next_index_for_derivation.is_none()),
+            "Programmer error, both 'veci' and 'maybe_next_index_for_derivation' cannot be none."
+        );
         if let Some(next_index_for_derivation) = maybe_next_index_for_derivation {
-            // must derive, should set `veci` if it is none.
             // furthermore, since we are deriving ANYWAY, we should also derive to Fill The Cache....
             let fill_cache_maybe_over_estimated =
                 FillCacheQuantitiesForFactor::fill(factor_source_id);
@@ -148,14 +131,17 @@ impl FactorInstancesProvider {
 
             let derived = self.derive(paths).await?;
             let (split_to_use_directly, split_to_cache) = self.split(veci, derived);
+
+            // unconditionally set `veci`, since `split` should handle logic of it
+            // being `None` or not.
             veci = Some(split_to_use_directly.account_veci()?.instance());
             to_cache = Some(split_to_cache);
         }
         let veci = veci.ok_or(CommonError::ExpectedValue)?;
-
-        Ok(ProvidedInstances::for_account_veci(
-            self.cache, veci, to_cache,
-        ))
+        if let Some(to_cache) = to_cache {
+            self.cache.append_for_factor(factor_source_id, to_cache)?;
+        }
+        Ok(ProvidedInstances::for_account_veci(self.cache, veci))
     }
 
     async fn provide_accounts_mfa(
@@ -164,5 +150,33 @@ impl FactorInstancesProvider {
         factor_sources: IndexSet<HDFactorSource>,
     ) -> Result<ProvidedInstances> {
         todo!()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    type Sut = FactorInstancesProvider;
+
+    #[actix::test]
+    async fn cache_is_always_filled_account_veci() {
+        let cache = Rc::new(RefCell::new(FactorInstancesForEachNetworkCache::default()));
+        let profile = Profile::default();
+        let bdfs = HDFactorSource::sample();
+        let sut = Sut::new(
+            cache,
+            NetworkID::Mainnet,
+            profile,
+            InstancesQuery::AccountVeci {
+                factor_source: bdfs.clone(),
+            },
+        );
+        let outcome = sut.provide().await.unwrap();
+        assert!(outcome
+            .cache_to_persist
+            .peek_all_instances_for_factor_source(bdfs.factor_source_id)
+            .unwrap()
+            .is_full());
     }
 }

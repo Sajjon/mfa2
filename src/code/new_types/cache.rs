@@ -6,6 +6,17 @@ pub struct FactorInstancesForSpecificNetworkCache {
     network_id: NetworkID,
     per_factor_source: IndexMap<FactorSourceID, CollectionsOfFactorInstances>,
 }
+impl FactorInstancesForSpecificNetworkCache {
+    pub fn append_for_factor(
+        &self,
+        factor_source_id: FactorSourceID,
+        instances: ToCache,
+    ) -> Result<()> {
+        assert_eq!(self.network_id, instances.0.network);
+        assert_eq!(factor_source_id, instances.0.factor_source_id);
+        todo!()
+    }
+}
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct FactorInstanceFromCache {
@@ -24,8 +35,8 @@ impl FactorInstancesForSpecificNetworkCache {
         }
     }
 
-    /// Does NOT mutate self
-    pub fn peek_account_veci(
+    /// Mutates self, consumes the next account veci if any, else returns None
+    pub fn consume_account_veci(
         &self,
         factor_source_id: FactorSourceID,
     ) -> Option<FactorInstanceFromCache> {
@@ -41,7 +52,7 @@ impl FactorInstancesForSpecificNetworkCache {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Default, Debug, PartialEq, Eq)]
 pub struct FactorInstancesForEachNetworkCache {
     #[allow(dead_code)]
     hidden_constructor: HiddenConstructor,

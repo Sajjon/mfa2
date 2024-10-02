@@ -13,25 +13,19 @@ pub struct ProvidedInstances {
     ///
     /// And often this contains just some of the newly created instances, because
     /// some might have gone into the `cache_to_persist` instead.
-    pub instances_to_be_used: IndexSet<HDFactorInstance>,
+    pub instances_to_be_used: ToUseDirectly,
 }
 impl ProvidedInstances {
     pub fn new(
         cache: FactorInstancesForSpecificNetworkCache,
         to_use_directly: ToUseDirectly,
-        to_cache: ToCache,
     ) -> Self {
         todo!()
     }
     pub fn for_account_veci(
         cache: FactorInstancesForSpecificNetworkCache,
         instance: HDFactorInstance,
-        to_cache: Option<ToCache>,
     ) -> Self {
-        Self::new(
-            cache,
-            ToUseDirectly::just(instance),
-            to_cache.unwrap_or_default(),
-        )
+        Self::new(cache, ToUseDirectly::just(instance))
     }
 }

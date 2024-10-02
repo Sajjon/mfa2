@@ -25,6 +25,17 @@ pub type Result<T, E = CommonError> = std::result::Result<T, E>;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct FactorSourceID([u8; 32]);
+impl FactorSourceID {
+    pub fn new(bytes: [u8; 32]) -> Self {
+        Self(bytes)
+    }
+    pub fn sample() -> Self {
+        Self::new([0xaa; 32])
+    }
+    pub fn sample_other() -> Self {
+        Self::new([0xbb; 32])
+    }
+}
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct HDFactorInstance {
@@ -50,24 +61,24 @@ pub enum CAP26KeyKind {
     AuthenticationSigning,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct MatrixOfFactorInstances {
     pub threshold: u16,
-    pub threshold_factors: IndexSet<HDFactorInstance>,
-    pub override_factors: IndexSet<HDFactorInstance>,
+    threshold_factors: Vec<HDFactorInstance>, // IndexSet, but need Hash.
+    override_factors: Vec<HDFactorInstance>,  // IndexSet, but need Hash.
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum EntitySecurityState {
     Unsecurified(HDFactorInstance),
     Securified(MatrixOfFactorInstances),
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Account {
     entity_security_state: EntitySecurityState,
 }
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Persona {
     entity_security_state: EntitySecurityState,
 }
@@ -76,6 +87,26 @@ pub struct Persona {
 pub struct HDFactorSource {
     pub factor_source_id: FactorSourceID,
 }
+impl HDFactorSource {
+    pub fn new(factor_source_id: FactorSourceID) -> Self {
+        Self { factor_source_id }
+    }
+    pub fn sample() -> Self {
+        Self::new(FactorSourceID::sample())
+    }
+    pub fn sample_other() -> Self {
+        Self::new(FactorSourceID::sample_other())
+    }
+}
+
+#[derive(Clone, Default, Debug, PartialEq, Eq)]
+pub struct Profile {
+    pub networks: IndexMap<NetworkID, ProfileOnNetwork>,
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Profile;
+pub struct ProfileOnNetwork {
+    pub network_id: NetworkID,
+    pub accounts: IndexSet<Account>,
+    pub personas: IndexSet<Persona>,
+}
