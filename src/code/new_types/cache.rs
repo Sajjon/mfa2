@@ -24,10 +24,19 @@ impl FactorInstancesForSpecificNetworkCache {
         }
     }
 
-    pub fn get_account_veci(
+    /// Does NOT mutate self
+    pub fn peek_account_veci(
         &self,
         factor_source_id: FactorSourceID,
     ) -> Option<FactorInstanceFromCache> {
+        todo!()
+    }
+
+    /// Does NOT mutate self
+    pub fn peek_all_instances_for_factor_source(
+        &self,
+        factor_source_id: FactorSourceID,
+    ) -> Option<CollectionsOfFactorInstances> {
         todo!()
     }
 }

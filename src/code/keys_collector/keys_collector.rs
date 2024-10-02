@@ -9,7 +9,12 @@ impl KeysCollector {
         todo!()
     }
     #[allow(unused)]
-    pub async fn collect_keys(self) -> IndexSet<HDFactorInstance> {
+    pub async fn collect_keys(self) -> KeyDerivationOutcome {
         todo!()
     }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct KeyDerivationOutcome {
+    instances: IndexSet<HDFactorInstance>,
 }

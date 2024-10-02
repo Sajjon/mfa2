@@ -25,6 +25,13 @@ impl FillCacheQuantitiesForFactor {
             account_vecis,
         }
     }
+
+    pub fn subtracting_existing(
+        self,
+        existing: impl Into<Option<CollectionsOfFactorInstances>>,
+    ) -> Self {
+        todo!()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -34,6 +34,9 @@ impl AccountVeci {
     pub fn network_id(&self) -> NetworkID {
         self.instance.derivation_path.network_id.clone()
     }
+    pub fn instance(&self) -> HDFactorInstance {
+        self.instance.clone()
+    }
 }
 
 /// A FactorInstance with a derivation path that is used for
@@ -68,7 +71,7 @@ impl IdentityVeci {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum DerivationTemplate {
     /// Account, Unsecurified, TransactionSigning,
     /// Veci: Virtual Entity Creating (Factor)Instance

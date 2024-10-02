@@ -1,5 +1,6 @@
 use crate::prelude::*;
 
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum InstancesQuery {
     /// Uses the "next" derivation entity index for the derivation path
     /// The network is already known by the FactorInstancesProvider

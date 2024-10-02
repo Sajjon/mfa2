@@ -16,12 +16,15 @@ pub enum CommonError {
 
     #[error("KeyKind Discrepancy")]
     KeyKindDiscrepancy,
+
+    #[error("Expected Value")]
+    ExpectedValue,
 }
 
 pub type Result<T, E = CommonError> = std::result::Result<T, E>;
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct FactorSourceID(String);
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct FactorSourceID([u8; 32]);
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct HDFactorInstance {
