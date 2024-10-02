@@ -197,5 +197,10 @@ mod tests {
             .peek_all_instances_for_factor_source(bdfs.factor_source_id)
             .unwrap()
             .is_full());
+
+        assert_eq!(
+            outcome.account_veci().unwrap().derivation_entity_index(),
+            CAP26EntityIndex::Unsecurified(1)
+        );
     }
 }

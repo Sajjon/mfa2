@@ -3,12 +3,30 @@ use crate::prelude::*;
 #[derive(Clone, Default, Debug, PartialEq, Eq, Hash)]
 pub struct HiddenConstructor;
 
+pub trait IsHDFactorInstance {
+    fn instance(&self) -> HDFactorInstance;
+    fn derivation_path(&self) -> DerivationPath {
+        self.instance().derivation_path.clone()
+    }
+    fn derivation_entity_index(&self) -> CAP26EntityIndex {
+        self.derivation_path().entity_index.clone()
+    }
+    fn network_id(&self) -> NetworkID {
+        self.derivation_path().network_id.clone()
+    }
+}
+
 /// A FactorInstance with a derivation path that is used for
 /// Account, Unsecurified, TransactionSigning
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct AccountVeci {
     hidden_constructor: HiddenConstructor,
     instance: HDFactorInstance,
+}
+impl IsHDFactorInstance for AccountVeci {
+    fn instance(&self) -> HDFactorInstance {
+        self.instance.clone()
+    }
 }
 impl AccountVeci {
     pub fn new(instance: HDFactorInstance) -> Result<Self> {
@@ -30,12 +48,6 @@ impl AccountVeci {
             hidden_constructor: HiddenConstructor,
             instance,
         })
-    }
-    pub fn network_id(&self) -> NetworkID {
-        self.instance.derivation_path.network_id.clone()
-    }
-    pub fn instance(&self) -> HDFactorInstance {
-        self.instance.clone()
     }
 }
 
@@ -66,8 +78,10 @@ impl IdentityVeci {
             instance,
         })
     }
-    pub fn network_id(&self) -> NetworkID {
-        self.instance.derivation_path.network_id.clone()
+}
+impl IsHDFactorInstance for IdentityVeci {
+    fn instance(&self) -> HDFactorInstance {
+        self.instance.clone()
     }
 }
 
