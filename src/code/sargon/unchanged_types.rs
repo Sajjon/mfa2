@@ -103,6 +103,20 @@ impl HDFactorSource {
 pub struct Profile {
     pub networks: IndexMap<NetworkID, ProfileOnNetwork>,
 }
+impl Profile {
+    pub fn accounts_on_network(&self, network_id: NetworkID) -> IndexSet<Account> {
+        self.networks
+            .get(&network_id)
+            .map(|p| p.accounts.clone())
+            .unwrap_or_default()
+    }
+    pub fn personas_on_network(&self, network_id: NetworkID) -> IndexSet<Persona> {
+        self.networks
+            .get(&network_id)
+            .map(|p| p.personas.clone())
+            .unwrap_or_default()
+    }
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ProfileOnNetwork {

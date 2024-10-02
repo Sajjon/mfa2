@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc};
+use std::sync::{Arc, RwLock};
 
 use crate::prelude::*;
 
@@ -6,7 +6,7 @@ pub struct FactorInstancesProvider {
     /// A Clone of a cache, the caller MUST commit the changes to the
     /// original cache if they want to persist them.
     #[allow(dead_code)]
-    cache: FactorInstancesForSpecificNetworkCache,
+    cache: RwLock<FactorInstancesForSpecificNetworkCache>,
 
     query: InstancesQuery,
 
@@ -14,39 +14,39 @@ pub struct FactorInstancesProvider {
 }
 
 impl FactorInstancesProvider {
-    fn for_specific_network(
-        cache: FactorInstancesForSpecificNetworkCache,
-        query: InstancesQuery,
-        next_entity_index_assigner: NextDerivationEntityIndexAssigner,
-    ) -> Self {
-        Self {
-            cache,
-            query,
-            next_entity_index_assigner,
-        }
-    }
-}
-
-impl FactorInstancesProvider {
     /// `Profile` is optional since None in case of Onboarding Account Recovery Scan
     /// No need to pass Profile as mut, since we just need to read it for the
     /// next derivation entity indices.
-    pub fn new(
-        cache: Rc<RefCell<FactorInstancesForEachNetworkCache>>,
-        network_id: NetworkID,
+    fn new(
+        cache_on_network: FactorInstancesForSpecificNetworkCache,
         profile: impl Into<Option<Profile>>,
         query: InstancesQuery,
     ) -> Self {
-        // let cache = cache.clone_for_network(network_id);
-        // Self::for_specific_network(
-        //     cache,
-        //     query,
-        //     NextDerivationEntityIndexAssigner::new(network_id, profile),
-        // )
-        todo!()
+        let network_id = cache_on_network.network_id;
+        Self {
+            cache: RwLock::new(cache_on_network),
+            query,
+            next_entity_index_assigner: NextDerivationEntityIndexAssigner::new(
+                network_id,
+                profile.into(),
+            ),
+        }
     }
 
-    pub async fn provide(self) -> Result<ProvidedInstances> {
+    pub async fn provide(
+        cache: Arc<RwLock<FactorInstancesForEachNetworkCache>>,
+        network_id: NetworkID,
+        profile: impl Into<Option<Profile>>,
+        query: InstancesQuery,
+    ) -> Result<ToUseDirectly> {
+        let cloned_cache = cache.read().unwrap().clone_for_network_or_empty(network_id);
+        let provider = Self::new(cloned_cache, profile, query);
+        let provided = provider._provide().await?;
+        cache.write().unwrap().merge(provided.cache_to_persist)?;
+        Ok(provided.instances_to_be_used)
+    }
+
+    async fn _provide(self) -> Result<ProvidedInstances> {
         match self.query.clone() {
             InstancesQuery::AccountMfa {
                 number_of_instances_per_factor_source,
@@ -90,7 +90,11 @@ impl FactorInstancesProvider {
     ) -> Result<ProvidedInstances> {
         let factor_source_id = factor_source.factor_source_id;
 
-        let maybe_cached = self.cache.consume_account_veci(factor_source_id);
+        let maybe_cached = self
+            .cache
+            .write()
+            .unwrap()
+            .consume_account_veci(factor_source_id);
         let mut maybe_next_index_for_derivation: Option<CAP26EntityIndex> = None;
         let mut veci: Option<HDFactorInstance> = None;
         let mut to_cache: Option<ToCache> = None;
@@ -119,6 +123,8 @@ impl FactorInstancesProvider {
 
             let existing = self
                 .cache
+                .read()
+                .unwrap()
                 .peek_all_instances_for_factor_source(factor_source.factor_source_id.clone());
 
             let fill_cache = fill_cache_maybe_over_estimated.subtracting_existing(existing);
@@ -139,9 +145,13 @@ impl FactorInstancesProvider {
         }
         let veci = veci.ok_or(CommonError::ExpectedValue)?;
         if let Some(to_cache) = to_cache {
-            self.cache.append_for_factor(factor_source_id, to_cache)?;
+            self.cache
+                .write()
+                .unwrap()
+                .append_for_factor(factor_source_id, to_cache)?;
         }
-        Ok(ProvidedInstances::for_account_veci(self.cache, veci))
+        let cache = self.cache.into_inner().unwrap();
+        Ok(ProvidedInstances::for_account_veci(cache, veci))
     }
 
     async fn provide_accounts_mfa(
@@ -155,26 +165,35 @@ impl FactorInstancesProvider {
 
 #[cfg(test)]
 mod tests {
+
     use super::*;
 
     type Sut = FactorInstancesProvider;
 
     #[actix::test]
     async fn cache_is_always_filled_account_veci() {
-        let cache = Rc::new(RefCell::new(FactorInstancesForEachNetworkCache::default()));
+        let cache = Arc::new(RwLock::new(FactorInstancesForEachNetworkCache::default()));
+
+        let network = NetworkID::Mainnet;
         let profile = Profile::default();
         let bdfs = HDFactorSource::sample();
-        let sut = Sut::new(
-            cache,
-            NetworkID::Mainnet,
+
+        let outcome = Sut::provide(
+            cache.clone(),
+            network,
             profile,
             InstancesQuery::AccountVeci {
                 factor_source: bdfs.clone(),
             },
-        );
-        let outcome = sut.provide().await.unwrap();
-        assert!(outcome
-            .cache_to_persist
+        )
+        .await
+        .unwrap();
+
+        assert!(cache
+            .try_read()
+            .unwrap()
+            .clone_for_network(network)
+            .unwrap()
             .peek_all_instances_for_factor_source(bdfs.factor_source_id)
             .unwrap()
             .is_full());

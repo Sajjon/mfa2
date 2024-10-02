@@ -3,7 +3,8 @@ use crate::prelude::*;
 /// On one specific network
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FactorInstancesForSpecificNetworkCache {
-    network_id: NetworkID,
+    hidden_constructor: HiddenConstructor,
+    pub network_id: NetworkID,
     per_factor_source: IndexMap<FactorSourceID, CollectionsOfFactorInstances>,
 }
 impl FactorInstancesForSpecificNetworkCache {
@@ -30,6 +31,7 @@ pub struct FactorInstanceFromCache {
 impl FactorInstancesForSpecificNetworkCache {
     pub fn empty(network: NetworkID) -> Self {
         Self {
+            hidden_constructor: HiddenConstructor,
             network_id: network,
             per_factor_source: IndexMap::new(),
         }
@@ -59,12 +61,20 @@ pub struct FactorInstancesForEachNetworkCache {
     pub networks: HashMap<NetworkID, FactorInstancesForSpecificNetworkCache>,
 }
 impl FactorInstancesForEachNetworkCache {
-    /// Reads out the existing `FactorInstancesForSpecificNetworkCache` if any,
-    /// otherwise creates a new empty one (mutates self with interior mutability).
-    pub fn clone_for_network(self, network: NetworkID) -> FactorInstancesForSpecificNetworkCache {
-        self.networks
-            .get(&network)
-            .cloned()
-            .unwrap_or(FactorInstancesForSpecificNetworkCache::empty(network))
+    pub fn clone_for_network_or_empty(
+        &self,
+        network_id: NetworkID,
+    ) -> FactorInstancesForSpecificNetworkCache {
+        self.clone_for_network(network_id)
+            .unwrap_or(FactorInstancesForSpecificNetworkCache::empty(network_id))
+    }
+    pub fn clone_for_network(
+        &self,
+        network_id: NetworkID,
+    ) -> Option<FactorInstancesForSpecificNetworkCache> {
+        self.networks.get(&network_id).cloned()
+    }
+    pub fn merge(&self, on_network: FactorInstancesForSpecificNetworkCache) -> Result<()> {
+        todo!()
     }
 }

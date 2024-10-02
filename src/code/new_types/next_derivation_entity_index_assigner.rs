@@ -9,7 +9,17 @@ pub struct NextDerivationEntityIndexProfileAnalyzingAssigner {
 }
 impl NextDerivationEntityIndexProfileAnalyzingAssigner {
     pub fn new(network_id: NetworkID, profile: Option<Profile>) -> Self {
-        todo!()
+        Self {
+            network_id,
+            accounts_on_network: profile
+                .as_ref()
+                .map(|p| p.accounts_on_network(network_id))
+                .unwrap_or_default(),
+            personas_on_network: profile
+                .as_ref()
+                .map(|p| p.personas_on_network(network_id))
+                .unwrap_or_default(),
+        }
     }
 }
 
